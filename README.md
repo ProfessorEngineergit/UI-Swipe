@@ -1,19 +1,27 @@
-# UI-Swipe
+# UI Swipe
 
-**SwipeVerse** - Die süchtigste Social Media App für Nerds 🚀
+**UI Swipe** - Satisfying UI Components zum Durchswipen ✨
 
-Eine hochgradig süchtigmachende Social Media Swipe-Webseite mit app-ähnlichem Verhalten, erstellt mit reinem HTML, CSS und JavaScript.
+Eine interaktive Swipe-App mit richtig befriedigenden CSS UI-Komponenten wie Toggles, Buttons, Checkboxes, Sliders und mehr. Inspiriert von UIverse/UIBurst.
 
 ## ✨ Features
 
-- 📱 **App-Like Experience** - Feste Header/Footer, kein Over-Scrolling
-- 🚫 **Zoom deaktiviert** - Double-Tap und Pinch-to-Zoom komplett verhindert
-- 💫 **Smooth Animations** - Heart-Animationen, Floating-Indikatoren, Transitions
-- 📜 **Infinite Scroll** - Automatisches Laden neuer Posts
-- ❤️ **Interaktive Elemente** - Like, Kommentar, Share mit visuellem Feedback
-- 🎨 **Dark Theme** - Modernes Design mit vibranten Gradients
-- 💾 **Offline Support** - Funktioniert mit Mock-Daten ohne Internet
-- 🔐 **Sicher** - XSS-Schutz, HTML-Escaping, CodeQL-getestet
+- 🎨 **Satisfying UI Components** - Handverlesene CSS-Komponenten mit tollen Animationen
+- 📱 **Swipe Navigation** - Swipe vertikal durch die Komponenten
+- 🔊 **Sound Effects** - Optionale Sounds bei Interaktionen
+- 💫 **Interactive** - Alle Komponenten sind voll interaktiv
+- 🏷️ **Categories** - Filter nach Toggles, Buttons, Checkboxes, Sliders, Loaders, Cards
+- 📱 **Mobile-First** - Optimiert für Touch-Geräte
+- 🌙 **Dark Theme** - Modernes dunkles Design
+
+## 🎯 Komponenten
+
+- **Toggles**: Neon, Liquid, Day/Night
+- **Buttons**: Glow, Ripple, 3D Press
+- **Checkboxes**: Bounce, Fill, Morph
+- **Sliders**: Gradient, Bubble Value
+- **Loaders**: Orbit, Wave Dots, Pulse Ring
+- **Cards**: 3D Tilt, Flip, Glow Border
 
 ## 🚀 Quick Start
 
@@ -31,9 +39,9 @@ npx serve .
 
 ```
 UI-Swipe/
-├── index.html    # HTML-Struktur mit Meta-Tags
-├── styles.css    # CSS3 mit Animationen & Responsive Design
-├── script.js     # Vanilla JavaScript mit Touch-Gesten
+├── index.html    # HTML-Struktur
+├── styles.css    # CSS mit allen Komponenten
+├── script.js     # JavaScript für Interaktionen
 ├── LICENSE       # MIT Lizenz
 └── README.md     # Diese Datei
 ```
@@ -41,20 +49,16 @@ UI-Swipe/
 ## 💻 Technologien
 
 - **HTML5** - Semantisches Markup
-- **CSS3** - Moderne Styles, Gradients, Animationen
-- **JavaScript** - Vanilla JS, keine Dependencies
-- **Canvas API** - Für Gradient-Bilder
-- **Touch Events** - Für mobile Gesten
+- **CSS3** - Animationen, Transitions, Gradients
+- **JavaScript** - Vanilla JS, Web Audio API für Sounds
+- **Scroll Snap** - Für smoothes Swipen
 
-## 🎯 Anforderungen erfüllt
+## 🎮 Bedienung
 
-✅ Double-Tap Zoom deaktiviert  
-✅ Pinch-to-Zoom deaktiviert  
-✅ Kein Scrolling über Header hinaus  
-✅ App-Like Mobile Experience  
-✅ Süchtigmachende UI mit Animationen  
-✅ Infinite Scroll  
-✅ Touch-Gesten Support  
+1. **Swipen** - Vertikal swipen für mehr Komponenten
+2. **Interagieren** - Tippe/Klicke auf Komponenten zum Ausprobieren
+3. **Filter** - Wähle eine Kategorie unten
+4. **Sound** - Schalte Sounds oben rechts an/aus
 
 ## 📱 Browser-Kompatibilität
 
@@ -63,16 +67,6 @@ UI-Swipe/
 - ✅ Safari (iOS & macOS)
 - ✅ Mobile Browser (iOS & Android)
 
-## 🛡️ Sicherheit
-
-- CodeQL Scan: ✅ 0 Vulnerabilities
-- XSS-Schutz: ✅ HTML-Escaping implementiert
-- Code Review: ✅ Bestanden
-
 ## 📄 Lizenz
 
 MIT License - siehe [LICENSE](LICENSE) für Details.
-
-## 🙏 Credits
-
-Erstellt als Demo für eine moderne, süchtigmachende Social Media Erfahrung.
