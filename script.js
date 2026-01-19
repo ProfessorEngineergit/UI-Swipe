@@ -4,6 +4,21 @@
  */
 
 // ===========================
+// Utility Functions
+// ===========================
+
+/**
+ * Sanitize HTML to prevent XSS attacks
+ * @param {string} str - String to sanitize
+ * @returns {string} Sanitized string
+ */
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// ===========================
 // API Service Class
 // ===========================
 class APIService {
@@ -19,10 +34,10 @@ class APIService {
      * @returns {Promise<Array>} Array of card data
      */
     async fetchCards(limit = 10) {
+        const start = (this.page - 1) * limit;
+        const url = `${this.apiUrl}?_start=${start}&_limit=${limit}`;
+        
         try {
-            const start = (this.page - 1) * limit;
-            const url = `${this.apiUrl}?_start=${start}&_limit=${limit}`;
-            
             // Check cache first
             if (this.cache.has(url)) {
                 console.log('📦 Returning cached data for page', this.page);
@@ -130,40 +145,33 @@ class APIService {
         canvas.height = 800;
         const ctx = canvas.getContext('2d');
         
+        // Gradient color map
+        const gradientMap = {
+            '#667eea': { start: '#667eea', end: '#764ba2' },
+            '#f093fb': { start: '#f093fb', end: '#f5576c' },
+            '#4facfe': { start: '#4facfe', end: '#00f2fe' },
+            '#43e97b': { start: '#43e97b', end: '#38f9d7' },
+            '#fa709a': { start: '#fa709a', end: '#fee140' },
+            '#30cfd0': { start: '#30cfd0', end: '#330867' },
+            '#a8edea': { start: '#a8edea', end: '#fed6e3' },
+            '#ff9a9e': { start: '#ff9a9e', end: '#fecfef' },
+            '#ffecd2': { start: '#ffecd2', end: '#fcb69f' },
+            '#ff6e7f': { start: '#ff6e7f', end: '#bfe9ff' }
+        };
+        
+        // Find matching gradient or use default
+        let colors = { start: '#ff6e7f', end: '#bfe9ff' };
+        for (const [key, value] of Object.entries(gradientMap)) {
+            if (gradient.includes(key)) {
+                colors = value;
+                break;
+            }
+        }
+        
         // Create gradient background
         const gradientObj = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-        // Parse gradient colors (simplified for common cases)
-        if (gradient.includes('#667eea')) {
-            gradientObj.addColorStop(0, '#667eea');
-            gradientObj.addColorStop(1, '#764ba2');
-        } else if (gradient.includes('#f093fb')) {
-            gradientObj.addColorStop(0, '#f093fb');
-            gradientObj.addColorStop(1, '#f5576c');
-        } else if (gradient.includes('#4facfe')) {
-            gradientObj.addColorStop(0, '#4facfe');
-            gradientObj.addColorStop(1, '#00f2fe');
-        } else if (gradient.includes('#43e97b')) {
-            gradientObj.addColorStop(0, '#43e97b');
-            gradientObj.addColorStop(1, '#38f9d7');
-        } else if (gradient.includes('#fa709a')) {
-            gradientObj.addColorStop(0, '#fa709a');
-            gradientObj.addColorStop(1, '#fee140');
-        } else if (gradient.includes('#30cfd0')) {
-            gradientObj.addColorStop(0, '#30cfd0');
-            gradientObj.addColorStop(1, '#330867');
-        } else if (gradient.includes('#a8edea')) {
-            gradientObj.addColorStop(0, '#a8edea');
-            gradientObj.addColorStop(1, '#fed6e3');
-        } else if (gradient.includes('#ff9a9e')) {
-            gradientObj.addColorStop(0, '#ff9a9e');
-            gradientObj.addColorStop(1, '#fecfef');
-        } else if (gradient.includes('#ffecd2')) {
-            gradientObj.addColorStop(0, '#ffecd2');
-            gradientObj.addColorStop(1, '#fcb69f');
-        } else {
-            gradientObj.addColorStop(0, '#ff6e7f');
-            gradientObj.addColorStop(1, '#bfe9ff');
-        }
+        gradientObj.addColorStop(0, colors.start);
+        gradientObj.addColorStop(1, colors.end);
         
         ctx.fillStyle = gradientObj;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -435,14 +443,19 @@ class CardManager {
         card.className = 'swipe-card';
         card.dataset.id = data.id;
         
+        // Sanitize user-provided data
+        const safeTitle = escapeHtml(this.truncate(data.title, 50));
+        const safeDescription = escapeHtml(data.description);
+        const safeImageUrl = escapeHtml(data.imageUrl);
+        
         card.innerHTML = `
-            <img src="${data.imageUrl}" alt="${data.title}" class="card-image" loading="lazy">
+            <img src="${safeImageUrl}" alt="${safeTitle}" class="card-image" loading="lazy">
             <div class="card-id">#${data.id}</div>
             <div class="swipe-indicator like">LIKE</div>
             <div class="swipe-indicator nope">NOPE</div>
             <div class="card-overlay">
-                <h2 class="card-title">${this.truncate(data.title, 50)}</h2>
-                <p class="card-description">${data.description}</p>
+                <h2 class="card-title">${safeTitle}</h2>
+                <p class="card-description">${safeDescription}</p>
             </div>
         `;
         
