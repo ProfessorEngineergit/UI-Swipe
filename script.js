@@ -278,16 +278,17 @@ function createPostElement(post) {
     article.className = 'post-card';
     article.dataset.postId = post.id;
     
-    const userInitial = post.user.name ? post.user.name[0].toUpperCase() : 'U';
-    const username = post.user.name || 'Anonymous User';
-    const userCompany = post.user.company?.name || 'Tech Enthusiast';
+    const userInitial = post.user.name ? escapeHtml(post.user.name[0].toUpperCase()) : 'U';
+    const username = escapeHtml(post.user.name || 'Anonymous User');
+    const userCompany = escapeHtml(post.user.company?.name || 'Tech Enthusiast');
+    const postTitle = escapeHtml(post.title);
     
     article.innerHTML = `
         <div class="post-header">
             <div class="avatar">${userInitial}</div>
             <div class="user-info">
                 <div class="username">${username}</div>
-                <div class="post-time">${post.timestamp} • ${userCompany}</div>
+                <div class="post-time">${escapeHtml(post.timestamp)} • ${userCompany}</div>
             </div>
             <button class="post-options">
                 <svg viewBox="0 0 24 24" fill="currentColor">
@@ -296,8 +297,8 @@ function createPostElement(post) {
             </button>
         </div>
         <div class="post-content">
-            <p class="post-text">${post.title}</p>
-            <img src="${post.image}" alt="${post.title}" class="post-image" loading="lazy">
+            <p class="post-text">${postTitle}</p>
+            <img src="${escapeHtml(post.image)}" alt="${postTitle}" class="post-image" loading="lazy">
         </div>
         <div class="post-stats">
             <span class="stat-item">
@@ -449,6 +450,12 @@ function setupInfiniteScroll() {
 }
 
 // Utility Functions
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 function formatNumber(num) {
     if (num >= 1000000) {
         return (num / 1000000).toFixed(1) + 'M';
@@ -514,8 +521,8 @@ if (document.readyState === 'loading') {
 // Service Worker for PWA (optional enhancement)
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => {
-            console.log('Service Worker registration failed');
+        navigator.serviceWorker.register('/sw.js').catch((error) => {
+            console.log('Service Worker registration failed:', error);
         });
     });
 }
