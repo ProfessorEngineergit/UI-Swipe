@@ -1,530 +1,508 @@
-// SwipeVerse - Ultra Addictive Social Media Experience
-// Disable double-tap zoom
+// UI Swipe - Satisfying UI Components
+// Disable zoom gestures
 let lastTouchEnd = 0;
-document.addEventListener('touchend', (event) => {
+document.addEventListener('touchend', (e) => {
     const now = Date.now();
-    if (now - lastTouchEnd <= 300) {
-        event.preventDefault();
-    }
+    if (now - lastTouchEnd <= 300) e.preventDefault();
     lastTouchEnd = now;
 }, false);
 
-// Prevent pinch zoom
-document.addEventListener('gesturestart', (event) => {
-    event.preventDefault();
-});
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('gesturechange', e => e.preventDefault());
+document.addEventListener('gestureend', e => e.preventDefault());
 
-document.addEventListener('gesturechange', (event) => {
-    event.preventDefault();
-});
+// Sound effects using Web Audio API
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+let soundEnabled = true;
 
-document.addEventListener('gestureend', (event) => {
-    event.preventDefault();
-});
-
-// State Management
-const state = {
-    posts: [],
-    currentPage: 1,
-    isLoading: false,
-    hasMorePosts: true,
-    likedPosts: new Set(),
-    doubleTapTimeout: null
-};
-
-// DOM Elements
-const feedContainer = document.getElementById('feedContainer');
-const loadingSpinner = document.getElementById('loadingSpinner');
-const likeAnimation = document.getElementById('likeAnimation');
-const swipeIndicator = document.getElementById('swipeIndicator');
-const bottomNavButtons = document.querySelectorAll('.nav-btn');
-
-// API Configuration - Using JSONPlaceholder for posts and Picsum for images
-const API_BASE = 'https://jsonplaceholder.typicode.com';
-const IMAGE_BASE = 'https://picsum.photos';
-
-// Initialize App
-async function initApp() {
-    console.log('🚀 Initializing SwipeVerse...');
-    
-    // Setup event listeners
-    setupEventListeners();
-    
-    // Load initial posts
-    await loadPosts();
-    
-    // Hide swipe indicator after 5 seconds
-    setTimeout(() => {
-        swipeIndicator.classList.add('hidden');
-    }, 5000);
-    
-    // Setup infinite scroll
-    setupInfiniteScroll();
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new AudioContext();
+    }
 }
 
-// Setup Event Listeners
-function setupEventListeners() {
-    // Bottom navigation
-    bottomNavButtons.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            bottomNavButtons.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            
-            const tab = btn.getAttribute('data-tab');
-            handleNavigation(tab);
-        });
-    });
+function playSound(type) {
+    if (!soundEnabled || !audioCtx) return;
     
-    // Notification button
-    document.getElementById('notificationBtn').addEventListener('click', () => {
-        showNotification('Du hast 3 neue Benachrichtigungen! 🔥');
-    });
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
     
-    // Menu button
-    document.getElementById('menuBtn').addEventListener('click', () => {
-        showNotification('Menü wird geladen... ⚡');
-    });
-}
-
-// Handle Navigation
-function handleNavigation(tab) {
-    console.log(`Navigating to: ${tab}`);
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
     
-    const messages = {
-        home: 'Willkommen zurück! 🏠',
-        explore: 'Entdecke neue Inhalte! 🔍',
-        add: 'Erstelle deinen Post! ➕',
-        messages: 'Deine Nachrichten 💬',
-        profile: 'Dein Profil 👤'
+    const sounds = {
+        click: { freq: 800, duration: 0.08, type: 'sine' },
+        toggle: { freq: 600, duration: 0.12, type: 'sine' },
+        success: { freq: 880, duration: 0.15, type: 'sine' },
+        pop: { freq: 400, duration: 0.06, type: 'triangle' },
+        slide: { freq: 300, duration: 0.1, type: 'sine' },
+        flip: { freq: 500, duration: 0.2, type: 'triangle' }
     };
     
-    if (messages[tab]) {
-        showNotification(messages[tab]);
-    }
+    const sound = sounds[type] || sounds.click;
+    oscillator.type = sound.type;
+    oscillator.frequency.setValueAtTime(sound.freq, audioCtx.currentTime);
     
-    // Scroll to top on home
-    if (tab === 'home') {
-        feedContainer.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + sound.duration);
+    
+    oscillator.start(audioCtx.currentTime);
+    oscillator.stop(audioCtx.currentTime + sound.duration);
 }
 
-// Mock Data Fallback
-const mockUsers = [
-    { id: 1, name: 'Max Mustermann', company: { name: 'Tech Innovations GmbH' } },
-    { id: 2, name: 'Anna Schmidt', company: { name: 'Digital Dynamics' } },
-    { id: 3, name: 'Tom Weber', company: { name: 'Code Masters' } },
-    { id: 4, name: 'Lisa Müller', company: { name: 'Creative Studios' } },
-    { id: 5, name: 'Chris Berg', company: { name: 'Future Labs' } },
-    { id: 6, name: 'Sarah Klein', company: { name: 'DevOps Pro' } },
-    { id: 7, name: 'Paul Richter', company: { name: 'AI Research' } },
-    { id: 8, name: 'Emma Koch', company: { name: 'Cloud Solutions' } },
-    { id: 9, name: 'Leon Wolf', company: { name: 'Data Science Inc' } },
-    { id: 10, name: 'Nina Bauer', company: { name: 'UX Design Co' } }
-];
-
-const mockPosts = [
-    { title: 'Unglaubliche neue KI-Technologie revolutioniert die Entwicklung! 🚀', body: 'Machine Learning erreicht neue Höhen...' },
-    { title: 'Die 10 besten Coding-Tipps für 2024 💻', body: 'Experten teilen ihre Geheimnisse...' },
-    { title: 'Neues Framework übertrifft alle Erwartungen! ⚡', body: 'Performance-Steigerung um 300%...' },
-    { title: 'Bahnbrechende Discovery in der Cybersecurity 🔒', body: 'Neue Verschlüsselungsmethode entwickelt...' },
-    { title: 'Cloud Computing 2.0 ist hier! ☁️', body: 'Die Zukunft der Infrastruktur...' },
-    { title: 'Quantencomputer macht große Fortschritte 🔬', body: 'Wissenschaftler erzielen Durchbruch...' },
-    { title: 'Blockchain-Innovation verändert alles 🔗', body: 'Neue Anwendungsfälle entdeckt...' },
-    { title: 'VR/AR erreicht neue Dimensionen 🥽', body: 'Immersive Erlebnisse wie nie zuvor...' },
-    { title: 'Open Source Projekt goes viral! 🌟', body: '100K Stars in einer Woche...' },
-    { title: 'IoT-Geräte werden noch smarter 📱', body: 'Die nächste Generation ist da...' },
-    { title: 'Neuronale Netze lernen menschliche Kreativität 🎨', body: 'Erstaunliche Ergebnisse in Tests...' },
-    { title: 'Developer Community wächst exponentiell 👥', body: 'Millionen neue Programmierer weltweit...' },
-    { title: 'Green Tech Solutions für eine bessere Zukunft 🌱', body: 'Nachhaltigkeit trifft Technologie...' },
-    { title: 'Robotik-Startup erhält Mega-Finanzierung 🤖', body: '500M Investment für autonome Systeme...' },
-    { title: 'API-Design erreicht Perfektion ✨', body: 'RESTful war gestern, das hier ist morgen...' }
-];
-
-// Fetch Posts from API
-async function fetchPosts(page = 1) {
-    try {
-        const response = await fetch(`${API_BASE}/posts?_page=${page}&_limit=10`);
-        if (!response.ok) throw new Error('API not available');
-        
-        const posts = await response.json();
-        
-        // Fetch users for each post
-        const usersResponse = await fetch(`${API_BASE}/users`);
-        const users = await usersResponse.json();
-        
-        // Enrich posts with user data and random images
-        return posts.map(post => ({
-            id: post.id,
-            userId: post.userId,
-            title: post.title,
-            body: post.body,
-            user: users.find(u => u.id === post.userId) || {},
-            image: `${IMAGE_BASE}/600/400?random=${post.id}`,
-            likes: Math.floor(Math.random() * 5000) + 100,
-            comments: Math.floor(Math.random() * 500) + 10,
-            shares: Math.floor(Math.random() * 200) + 5,
-            timestamp: getRandomTimestamp()
-        }));
-    } catch (error) {
-        console.log('📦 Using mock data (API not available)');
-        // Return mock data as fallback
-        return generateMockPosts(page);
-    }
-}
-
-// Generate placeholder image with gradient
-function getPlaceholderImage(postId) {
-    const colors = [
-        ['#667eea', '#764ba2'], ['#f093fb', '#f5576c'], ['#4facfe', '#00f2fe'],
-        ['#43e97b', '#38f9d7'], ['#fa709a', '#fee140'], ['#30cfd0', '#330867'],
-        ['#a8edea', '#fed6e3'], ['#ff9a9e', '#fecfef'], ['#ffecd2', '#fcb69f'],
-        ['#ff6e7f', '#bfe9ff'], ['#e0c3fc', '#8ec5fc'], ['#fbc2eb', '#a6c1ee']
-    ];
-    const colorPair = colors[postId % colors.length];
-    
-    const canvas = document.createElement('canvas');
-    canvas.width = 600;
-    canvas.height = 400;
-    const ctx = canvas.getContext('2d');
-    
-    // Create gradient
-    const gradient = ctx.createLinearGradient(0, 0, 600, 400);
-    gradient.addColorStop(0, colorPair[0]);
-    gradient.addColorStop(1, colorPair[1]);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 600, 400);
-    
-    // Add decorative elements
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-    for (let i = 0; i < 10; i++) {
-        ctx.beginPath();
-        ctx.arc(Math.random() * 600, Math.random() * 400, Math.random() * 100 + 20, 0, Math.PI * 2);
-        ctx.fill();
-    }
-    
-    // Add text
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.font = 'bold 48px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`Post #${postId}`, 300, 200);
-    
-    return canvas.toDataURL('image/jpeg', 0.85);
-}
-
-// Generate Mock Posts
-function generateMockPosts(page = 1) {
-    const postsPerPage = 10;
-    const startIdx = (page - 1) * postsPerPage;
-    const posts = [];
-    
-    for (let i = 0; i < postsPerPage; i++) {
-        const idx = (startIdx + i) % mockPosts.length;
-        const userIdx = (startIdx + i) % mockUsers.length;
-        const postId = startIdx + i + 1;
-        
-        posts.push({
-            id: postId,
-            userId: mockUsers[userIdx].id,
-            title: mockPosts[idx].title,
-            body: mockPosts[idx].body,
-            user: mockUsers[userIdx],
-            image: getPlaceholderImage(postId),
-            likes: Math.floor(Math.random() * 5000) + 100,
-            comments: Math.floor(Math.random() * 500) + 10,
-            shares: Math.floor(Math.random() * 200) + 5,
-            timestamp: getRandomTimestamp()
-        });
-    }
-    
-    return posts;
-}
-
-// Load Posts
-async function loadPosts() {
-    if (state.isLoading || !state.hasMorePosts) return;
-    
-    state.isLoading = true;
-    loadingSpinner.classList.remove('hidden');
-    
-    const newPosts = await fetchPosts(state.currentPage);
-    
-    if (newPosts.length === 0) {
-        state.hasMorePosts = false;
-        loadingSpinner.innerHTML = '<p>Das war\'s! Keine weiteren Posts 🎉</p>';
-        return;
-    }
-    
-    state.posts.push(...newPosts);
-    state.currentPage++;
-    
-    renderPosts(newPosts);
-    
-    state.isLoading = false;
-    loadingSpinner.classList.add('hidden');
-}
-
-// Render Posts
-function renderPosts(posts) {
-    posts.forEach(post => {
-        const postElement = createPostElement(post);
-        feedContainer.insertBefore(postElement, loadingSpinner);
-    });
-}
-
-// Create Post Element
-function createPostElement(post) {
-    const article = document.createElement('article');
-    article.className = 'post-card';
-    article.dataset.postId = post.id;
-    
-    const userInitial = post.user.name ? escapeHtml(post.user.name[0].toUpperCase()) : 'U';
-    const username = escapeHtml(post.user.name || 'Anonymous User');
-    const userCompany = escapeHtml(post.user.company?.name || 'Tech Enthusiast');
-    const postTitle = escapeHtml(post.title);
-    
-    article.innerHTML = `
-        <div class="post-header">
-            <div class="avatar">${userInitial}</div>
-            <div class="user-info">
-                <div class="username">${username}</div>
-                <div class="post-time">${escapeHtml(post.timestamp)} • ${userCompany}</div>
+// UI Components Data
+const components = [
+    {
+        id: 'toggle-neon',
+        name: 'Neon Toggle',
+        description: 'Glühender Neon-Effekt beim Umschalten',
+        category: 'toggles',
+        html: `
+            <div class="toggle-neon">
+                <input type="checkbox" id="toggle-neon-1">
+                <label for="toggle-neon-1"></label>
             </div>
-            <button class="post-options">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
-                </svg>
-            </button>
-        </div>
-        <div class="post-content">
-            <p class="post-text">${postTitle}</p>
-            <img src="${escapeHtml(post.image)}" alt="${postTitle}" class="post-image" loading="lazy">
-        </div>
-        <div class="post-stats">
-            <span class="stat-item">
-                <strong>${formatNumber(post.likes)}</strong> Likes
-            </span>
-            <span class="stat-item">
-                <strong>${formatNumber(post.comments)}</strong> Kommentare
-            </span>
-            <span class="stat-item">
-                <strong>${formatNumber(post.shares)}</strong> Shares
-            </span>
-        </div>
-        <div class="post-actions">
-            <button class="action-btn like-btn" data-post-id="${post.id}">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                </svg>
-                <span>Like</span>
-            </button>
-            <button class="action-btn comment-btn">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
-                </svg>
-                <span>Kommentar</span>
-            </button>
-            <button class="action-btn share-btn">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
-                </svg>
-                <span>Teilen</span>
-            </button>
-        </div>
-    `;
-    
-    // Setup post interactions
-    setupPostInteractions(article, post);
-    
-    return article;
-}
-
-// Setup Post Interactions
-function setupPostInteractions(article, post) {
-    const likeBtn = article.querySelector('.like-btn');
-    const commentBtn = article.querySelector('.comment-btn');
-    const shareBtn = article.querySelector('.share-btn');
-    const postImage = article.querySelector('.post-image');
-    
-    // Like button
-    likeBtn.addEventListener('click', () => {
-        toggleLike(post.id, likeBtn);
-    });
-    
-    // Double tap on image to like
-    let lastImageTap = 0;
-    postImage.addEventListener('touchend', (e) => {
-        const now = Date.now();
-        if (now - lastImageTap < 300) {
-            e.preventDefault();
-            toggleLike(post.id, likeBtn);
-            showLikeAnimation();
-        }
-        lastImageTap = now;
-    });
-    
-    // Comment button
-    commentBtn.addEventListener('click', () => {
-        showNotification('Kommentarfunktion kommt bald! 💬');
-    });
-    
-    // Share button
-    shareBtn.addEventListener('click', () => {
-        if (navigator.share) {
-            navigator.share({
-                title: post.title,
-                text: post.body,
-                url: window.location.href
-            }).catch(() => {
-                showNotification('Geteilt! 🚀');
-            });
-        } else {
-            showNotification('Geteilt! 🚀');
-        }
-    });
-}
-
-// Toggle Like
-function toggleLike(postId, button) {
-    if (state.likedPosts.has(postId)) {
-        state.likedPosts.delete(postId);
-        button.classList.remove('liked');
-    } else {
-        state.likedPosts.add(postId);
-        button.classList.add('liked');
-        showLikeAnimation();
+        `,
+        sound: 'toggle'
+    },
+    {
+        id: 'toggle-liquid',
+        name: 'Liquid Toggle',
+        description: 'Flüssige Animation mit Farbverlauf',
+        category: 'toggles',
+        html: `
+            <div class="toggle-liquid">
+                <input type="checkbox" id="toggle-liquid-1">
+                <label for="toggle-liquid-1"></label>
+            </div>
+        `,
+        sound: 'toggle'
+    },
+    {
+        id: 'toggle-daynight',
+        name: 'Day/Night Toggle',
+        description: 'Wechsel zwischen Tag und Nacht',
+        category: 'toggles',
+        html: `
+            <div class="toggle-daynight">
+                <input type="checkbox" id="toggle-daynight-1">
+                <label for="toggle-daynight-1"></label>
+            </div>
+        `,
+        sound: 'toggle'
+    },
+    {
+        id: 'btn-glow',
+        name: 'Glow Button',
+        description: 'Pulsierender Leuchteffekt beim Hover',
+        category: 'buttons',
+        html: `<button class="btn-glow">Click Me</button>`,
+        sound: 'click'
+    },
+    {
+        id: 'btn-ripple',
+        name: 'Ripple Button',
+        description: 'Wellen-Effekt bei jedem Klick',
+        category: 'buttons',
+        html: `<button class="btn-ripple">Click Me</button>`,
+        sound: 'pop'
+    },
+    {
+        id: 'btn-3d',
+        name: '3D Press Button',
+        description: 'Physischer 3D-Drück-Effekt',
+        category: 'buttons',
+        html: `<button class="btn-3d">Press Me</button>`,
+        sound: 'click'
+    },
+    {
+        id: 'checkbox-bounce',
+        name: 'Bounce Checkbox',
+        description: 'Federnde Check-Animation',
+        category: 'checkboxes',
+        html: `
+            <div class="checkbox-bounce">
+                <input type="checkbox" id="cb-bounce-1">
+                <label for="cb-bounce-1"></label>
+            </div>
+        `,
+        sound: 'success'
+    },
+    {
+        id: 'checkbox-fill',
+        name: 'Fill Checkbox',
+        description: 'Ausfüllende Kreis-Animation',
+        category: 'checkboxes',
+        html: `
+            <div class="checkbox-fill">
+                <input type="checkbox" id="cb-fill-1">
+                <label for="cb-fill-1"></label>
+            </div>
+        `,
+        sound: 'success'
+    },
+    {
+        id: 'checkbox-morph',
+        name: 'Morph Checkbox',
+        description: 'X verwandelt sich in Häkchen',
+        category: 'checkboxes',
+        html: `
+            <div class="checkbox-morph">
+                <input type="checkbox" id="cb-morph-1">
+                <label for="cb-morph-1"></label>
+            </div>
+        `,
+        sound: 'success'
+    },
+    {
+        id: 'slider-gradient',
+        name: 'Gradient Slider',
+        description: 'Farbverlauf mit leuchtendem Knopf',
+        category: 'sliders',
+        html: `
+            <div class="slider-gradient">
+                <input type="range" min="0" max="100" value="50">
+            </div>
+        `,
+        sound: 'slide'
+    },
+    {
+        id: 'slider-bubble',
+        name: 'Bubble Slider',
+        description: 'Wert-Anzeige folgt dem Slider',
+        category: 'sliders',
+        html: `
+            <div class="slider-bubble">
+                <span class="slider-bubble-value">50</span>
+                <input type="range" min="0" max="100" value="50">
+            </div>
+        `,
+        sound: 'slide'
+    },
+    {
+        id: 'loader-orbit',
+        name: 'Orbit Loader',
+        description: 'Doppelte rotierende Ringe',
+        category: 'loaders',
+        html: `<div class="loader-orbit"></div>`
+    },
+    {
+        id: 'loader-dots',
+        name: 'Wave Dots',
+        description: 'Pulsierende Punkte-Animation',
+        category: 'loaders',
+        html: `
+            <div class="loader-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        `
+    },
+    {
+        id: 'loader-pulse',
+        name: 'Pulse Ring',
+        description: 'Ausbreitende Puls-Ringe',
+        category: 'loaders',
+        html: `<div class="loader-pulse"></div>`
+    },
+    {
+        id: 'card-tilt',
+        name: '3D Tilt Card',
+        description: 'Folgt deiner Maus/Touch-Bewegung',
+        category: 'cards',
+        html: `
+            <div class="card-tilt" data-tilt>
+                <div class="card-tilt-content">
+                    <span class="card-tilt-icon">🎴</span>
+                    <span>Bewege mich!</span>
+                </div>
+            </div>
+        `
+    },
+    {
+        id: 'card-flip',
+        name: 'Flip Card',
+        description: 'Tippe zum Umdrehen',
+        category: 'cards',
+        html: `
+            <div class="card-flip" data-flip>
+                <div class="card-flip-inner">
+                    <div class="card-flip-front">
+                        <span class="card-flip-icon">✨</span>
+                        <span>Vorderseite</span>
+                    </div>
+                    <div class="card-flip-back">
+                        <span class="card-flip-icon">🎉</span>
+                        <span>Rückseite!</span>
+                    </div>
+                </div>
+            </div>
+        `,
+        sound: 'flip'
+    },
+    {
+        id: 'card-glow',
+        name: 'Glow Border Card',
+        description: 'Animierter Leuchtrand beim Hover',
+        category: 'cards',
+        html: `
+            <div class="card-glow">
+                <span class="card-glow-icon">💎</span>
+                <span>Hover me!</span>
+            </div>
+        `
     }
+];
+
+// State
+let currentIndex = 0;
+let filteredComponents = [...components];
+let currentCategory = 'all';
+
+// DOM Elements
+const container = document.getElementById('componentContainer');
+const navDots = document.getElementById('navDots');
+const swipeHint = document.getElementById('swipeHint');
+const categoryNav = document.getElementById('categoryNav');
+const soundToggle = document.getElementById('soundToggle');
+const currentCategoryDisplay = document.getElementById('currentCategory');
+
+// Initialize
+function init() {
+    initAudio();
+    renderComponents();
+    setupEventListeners();
+    updateNavDots();
     
-    // Haptic feedback on mobile
-    if (navigator.vibrate) {
-        navigator.vibrate(50);
-    }
-}
-
-// Show Like Animation
-function showLikeAnimation() {
-    likeAnimation.classList.add('show');
+    // Hide swipe hint after 4 seconds
     setTimeout(() => {
-        likeAnimation.classList.remove('show');
-    }, 800);
+        swipeHint.classList.add('hidden');
+    }, 4000);
 }
 
-// Show Notification
-function showNotification(message) {
-    // Create toast notification
-    const toast = document.createElement('div');
-    toast.style.cssText = `
-        position: fixed;
-        top: 80px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(99, 102, 241, 0.95);
-        color: white;
-        padding: 15px 25px;
-        border-radius: 25px;
-        font-weight: 600;
-        z-index: 10000;
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
-        animation: slideDown 0.3s ease;
-    `;
-    toast.textContent = message;
-    document.body.appendChild(toast);
+// Render all components
+function renderComponents() {
+    container.innerHTML = '';
+    navDots.innerHTML = '';
     
-    setTimeout(() => {
-        toast.style.animation = 'slideUp 0.3s ease';
-        setTimeout(() => toast.remove(), 300);
-    }, 2000);
-}
-
-// Setup Infinite Scroll
-function setupInfiniteScroll() {
-    feedContainer.addEventListener('scroll', () => {
-        const scrollPosition = feedContainer.scrollTop + feedContainer.clientHeight;
-        const scrollHeight = feedContainer.scrollHeight;
+    filteredComponents.forEach((comp, index) => {
+        // Create card
+        const card = document.createElement('div');
+        card.className = 'component-card';
+        card.dataset.index = index;
+        card.innerHTML = `
+            <div class="component-wrapper">
+                <div class="component-display">
+                    ${comp.html}
+                </div>
+                <div class="component-info">
+                    <div class="component-name">${comp.name}</div>
+                    <div class="component-description">${comp.description}</div>
+                    <span class="component-tag">${comp.category}</span>
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
         
-        // Load more when 80% scrolled
-        if (scrollPosition >= scrollHeight * 0.8 && !state.isLoading) {
-            loadPosts();
-        }
+        // Create nav dot
+        const dot = document.createElement('div');
+        dot.className = 'nav-dot';
+        dot.dataset.index = index;
+        dot.addEventListener('click', () => scrollToComponent(index));
+        navDots.appendChild(dot);
     });
-}
-
-// Utility Functions
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function formatNumber(num) {
-    if (num >= 1000000) {
-        return (num / 1000000).toFixed(1) + 'M';
-    }
-    if (num >= 1000) {
-        return (num / 1000).toFixed(1) + 'K';
-    }
-    return num.toString();
-}
-
-function getRandomTimestamp() {
-    const timestamps = [
-        'Gerade eben',
-        '2 Min',
-        '5 Min',
-        '15 Min',
-        '30 Min',
-        '1 Std',
-        '2 Std',
-        '5 Std',
-        '12 Std',
-        '1 Tag',
-        '2 Tage',
-        '1 Woche'
-    ];
-    return timestamps[Math.floor(Math.random() * timestamps.length)];
-}
-
-// Add CSS animations for toast
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideDown {
-        from {
-            opacity: 0;
-            transform: translateX(-50%) translateY(-20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
-    }
     
-    @keyframes slideUp {
-        from {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
-        to {
-            opacity: 0;
-            transform: translateX(-50%) translateY(-20px);
-        }
-    }
-`;
-document.head.appendChild(style);
-
-// Start the app when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initApp);
-} else {
-    initApp();
+    setupComponentInteractions();
 }
 
-// Service Worker for PWA (optional enhancement)
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch((error) => {
-            console.log('Service Worker registration failed:', error);
+// Setup component-specific interactions
+function setupComponentInteractions() {
+    // Ripple buttons
+    document.querySelectorAll('.btn-ripple').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            const ripple = document.createElement('span');
+            ripple.className = 'ripple';
+            const rect = this.getBoundingClientRect();
+            const size = Math.max(rect.width, rect.height);
+            ripple.style.width = ripple.style.height = size + 'px';
+            ripple.style.left = (e.clientX - rect.left - size/2) + 'px';
+            ripple.style.top = (e.clientY - rect.top - size/2) + 'px';
+            this.appendChild(ripple);
+            playSound('pop');
+            setTimeout(() => ripple.remove(), 600);
+        });
+    });
+    
+    // Regular buttons
+    document.querySelectorAll('.btn-glow, .btn-3d').forEach(btn => {
+        btn.addEventListener('click', () => playSound('click'));
+    });
+    
+    // Toggles
+    document.querySelectorAll('.toggle-neon input, .toggle-liquid input, .toggle-daynight input').forEach(toggle => {
+        toggle.addEventListener('change', () => {
+            playSound('toggle');
+            if (navigator.vibrate) navigator.vibrate(30);
+        });
+    });
+    
+    // Checkboxes
+    document.querySelectorAll('.checkbox-bounce input, .checkbox-fill input, .checkbox-morph input').forEach(cb => {
+        cb.addEventListener('change', () => {
+            playSound('success');
+            if (navigator.vibrate) navigator.vibrate(20);
+        });
+    });
+    
+    // Sliders
+    document.querySelectorAll('.slider-gradient input, .slider-bubble input').forEach(slider => {
+        let lastSoundTime = 0;
+        slider.addEventListener('input', function() {
+            const now = Date.now();
+            if (now - lastSoundTime > 100) {
+                playSound('slide');
+                lastSoundTime = now;
+            }
+            
+            // Update bubble value if exists
+            const bubble = this.parentElement.querySelector('.slider-bubble-value');
+            if (bubble) {
+                bubble.textContent = this.value;
+                const percent = (this.value - this.min) / (this.max - this.min);
+                const thumbWidth = 20;
+                const trackWidth = this.offsetWidth - thumbWidth;
+                bubble.style.left = (percent * trackWidth + thumbWidth/2) + 'px';
+            }
+        });
+    });
+    
+    // 3D Tilt cards
+    document.querySelectorAll('[data-tilt]').forEach(card => {
+        card.addEventListener('mousemove', handleTilt);
+        card.addEventListener('touchmove', handleTilt);
+        card.addEventListener('mouseleave', resetTilt);
+        card.addEventListener('touchend', resetTilt);
+    });
+    
+    // Flip cards
+    document.querySelectorAll('[data-flip]').forEach(card => {
+        card.addEventListener('click', () => {
+            card.classList.toggle('flipped');
+            playSound('flip');
+            if (navigator.vibrate) navigator.vibrate(40);
         });
     });
 }
 
-console.log('🎉 SwipeVerse loaded successfully!');
+// Handle 3D tilt effect
+function handleTilt(e) {
+    const card = e.currentTarget;
+    const rect = card.getBoundingClientRect();
+    
+    let x, y;
+    if (e.touches) {
+        x = e.touches[0].clientX - rect.left;
+        y = e.touches[0].clientY - rect.top;
+    } else {
+        x = e.clientX - rect.left;
+        y = e.clientY - rect.top;
+    }
+    
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const rotateX = (y - centerY) / 10;
+    const rotateY = (centerX - x) / 10;
+    
+    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.05, 1.05, 1.05)`;
+}
+
+function resetTilt(e) {
+    e.currentTarget.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+}
+
+// Setup event listeners
+function setupEventListeners() {
+    // Scroll detection for nav dots
+    container.addEventListener('scroll', () => {
+        const cardHeight = container.firstElementChild?.offsetHeight || 0;
+        if (cardHeight > 0) {
+            currentIndex = Math.round(container.scrollTop / cardHeight);
+            updateNavDots();
+            updateCategoryDisplay();
+        }
+    });
+    
+    // Category filter
+    categoryNav.addEventListener('click', (e) => {
+        if (e.target.classList.contains('category-btn')) {
+            document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active'));
+            e.target.classList.add('active');
+            
+            currentCategory = e.target.dataset.category;
+            filterComponents(currentCategory);
+            playSound('click');
+        }
+    });
+    
+    // Sound toggle
+    soundToggle.addEventListener('click', () => {
+        initAudio();
+        soundEnabled = !soundEnabled;
+        soundToggle.querySelector('.sound-on').style.display = soundEnabled ? 'block' : 'none';
+        soundToggle.querySelector('.sound-off').style.display = soundEnabled ? 'none' : 'block';
+        if (soundEnabled) playSound('click');
+    });
+    
+    // Enable audio on first user interaction
+    document.addEventListener('click', initAudio, { once: true });
+    document.addEventListener('touchstart', initAudio, { once: true });
+}
+
+// Filter components by category
+function filterComponents(category) {
+    if (category === 'all') {
+        filteredComponents = [...components];
+    } else {
+        filteredComponents = components.filter(c => c.category === category);
+    }
+    currentIndex = 0;
+    renderComponents();
+    updateNavDots();
+    updateCategoryDisplay();
+}
+
+// Scroll to specific component
+function scrollToComponent(index) {
+    const cardHeight = container.firstElementChild?.offsetHeight || 0;
+    container.scrollTo({
+        top: index * cardHeight,
+        behavior: 'smooth'
+    });
+    playSound('click');
+}
+
+// Update navigation dots
+function updateNavDots() {
+    document.querySelectorAll('.nav-dot').forEach((dot, i) => {
+        dot.classList.toggle('active', i === currentIndex);
+    });
+}
+
+// Update category display in header
+function updateCategoryDisplay() {
+    if (filteredComponents[currentIndex]) {
+        const category = filteredComponents[currentIndex].category;
+        currentCategoryDisplay.textContent = category.charAt(0).toUpperCase() + category.slice(1);
+    }
+}
+
+// Start app
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
+
+console.log('✨ UI Swipe loaded!');
