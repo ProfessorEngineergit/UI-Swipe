@@ -108,10 +108,44 @@ function handleNavigation(tab) {
     }
 }
 
+// Mock Data Fallback
+const mockUsers = [
+    { id: 1, name: 'Max Mustermann', company: { name: 'Tech Innovations GmbH' } },
+    { id: 2, name: 'Anna Schmidt', company: { name: 'Digital Dynamics' } },
+    { id: 3, name: 'Tom Weber', company: { name: 'Code Masters' } },
+    { id: 4, name: 'Lisa Müller', company: { name: 'Creative Studios' } },
+    { id: 5, name: 'Chris Berg', company: { name: 'Future Labs' } },
+    { id: 6, name: 'Sarah Klein', company: { name: 'DevOps Pro' } },
+    { id: 7, name: 'Paul Richter', company: { name: 'AI Research' } },
+    { id: 8, name: 'Emma Koch', company: { name: 'Cloud Solutions' } },
+    { id: 9, name: 'Leon Wolf', company: { name: 'Data Science Inc' } },
+    { id: 10, name: 'Nina Bauer', company: { name: 'UX Design Co' } }
+];
+
+const mockPosts = [
+    { title: 'Unglaubliche neue KI-Technologie revolutioniert die Entwicklung! 🚀', body: 'Machine Learning erreicht neue Höhen...' },
+    { title: 'Die 10 besten Coding-Tipps für 2024 💻', body: 'Experten teilen ihre Geheimnisse...' },
+    { title: 'Neues Framework übertrifft alle Erwartungen! ⚡', body: 'Performance-Steigerung um 300%...' },
+    { title: 'Bahnbrechende Discovery in der Cybersecurity 🔒', body: 'Neue Verschlüsselungsmethode entwickelt...' },
+    { title: 'Cloud Computing 2.0 ist hier! ☁️', body: 'Die Zukunft der Infrastruktur...' },
+    { title: 'Quantencomputer macht große Fortschritte 🔬', body: 'Wissenschaftler erzielen Durchbruch...' },
+    { title: 'Blockchain-Innovation verändert alles 🔗', body: 'Neue Anwendungsfälle entdeckt...' },
+    { title: 'VR/AR erreicht neue Dimensionen 🥽', body: 'Immersive Erlebnisse wie nie zuvor...' },
+    { title: 'Open Source Projekt goes viral! 🌟', body: '100K Stars in einer Woche...' },
+    { title: 'IoT-Geräte werden noch smarter 📱', body: 'Die nächste Generation ist da...' },
+    { title: 'Neuronale Netze lernen menschliche Kreativität 🎨', body: 'Erstaunliche Ergebnisse in Tests...' },
+    { title: 'Developer Community wächst exponentiell 👥', body: 'Millionen neue Programmierer weltweit...' },
+    { title: 'Green Tech Solutions für eine bessere Zukunft 🌱', body: 'Nachhaltigkeit trifft Technologie...' },
+    { title: 'Robotik-Startup erhält Mega-Finanzierung 🤖', body: '500M Investment für autonome Systeme...' },
+    { title: 'API-Design erreicht Perfektion ✨', body: 'RESTful war gestern, das hier ist morgen...' }
+];
+
 // Fetch Posts from API
 async function fetchPosts(page = 1) {
     try {
         const response = await fetch(`${API_BASE}/posts?_page=${page}&_limit=10`);
+        if (!response.ok) throw new Error('API not available');
+        
         const posts = await response.json();
         
         // Fetch users for each post
@@ -132,9 +166,78 @@ async function fetchPosts(page = 1) {
             timestamp: getRandomTimestamp()
         }));
     } catch (error) {
-        console.error('Error fetching posts:', error);
-        return [];
+        console.log('📦 Using mock data (API not available)');
+        // Return mock data as fallback
+        return generateMockPosts(page);
     }
+}
+
+// Generate placeholder image with gradient
+function getPlaceholderImage(postId) {
+    const colors = [
+        ['#667eea', '#764ba2'], ['#f093fb', '#f5576c'], ['#4facfe', '#00f2fe'],
+        ['#43e97b', '#38f9d7'], ['#fa709a', '#fee140'], ['#30cfd0', '#330867'],
+        ['#a8edea', '#fed6e3'], ['#ff9a9e', '#fecfef'], ['#ffecd2', '#fcb69f'],
+        ['#ff6e7f', '#bfe9ff'], ['#e0c3fc', '#8ec5fc'], ['#fbc2eb', '#a6c1ee']
+    ];
+    const colorPair = colors[postId % colors.length];
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = 600;
+    canvas.height = 400;
+    const ctx = canvas.getContext('2d');
+    
+    // Create gradient
+    const gradient = ctx.createLinearGradient(0, 0, 600, 400);
+    gradient.addColorStop(0, colorPair[0]);
+    gradient.addColorStop(1, colorPair[1]);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 600, 400);
+    
+    // Add decorative elements
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    for (let i = 0; i < 10; i++) {
+        ctx.beginPath();
+        ctx.arc(Math.random() * 600, Math.random() * 400, Math.random() * 100 + 20, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    // Add text
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.font = 'bold 48px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`Post #${postId}`, 300, 200);
+    
+    return canvas.toDataURL('image/jpeg', 0.85);
+}
+
+// Generate Mock Posts
+function generateMockPosts(page = 1) {
+    const postsPerPage = 10;
+    const startIdx = (page - 1) * postsPerPage;
+    const posts = [];
+    
+    for (let i = 0; i < postsPerPage; i++) {
+        const idx = (startIdx + i) % mockPosts.length;
+        const userIdx = (startIdx + i) % mockUsers.length;
+        const postId = startIdx + i + 1;
+        
+        posts.push({
+            id: postId,
+            userId: mockUsers[userIdx].id,
+            title: mockPosts[idx].title,
+            body: mockPosts[idx].body,
+            user: mockUsers[userIdx],
+            image: getPlaceholderImage(postId),
+            likes: Math.floor(Math.random() * 5000) + 100,
+            comments: Math.floor(Math.random() * 500) + 10,
+            shares: Math.floor(Math.random() * 200) + 5,
+            timestamp: getRandomTimestamp()
+        });
+    }
+    
+    return posts;
 }
 
 // Load Posts
