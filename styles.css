@@ -26,7 +26,6 @@
     /* Layout */
     --header-height: 70px;
     --actions-height: 100px;
-    --card-max-width: 400px;
 }
 
 html, body {
@@ -474,14 +473,6 @@ html, body {
    Responsive
    ========== */
 @media (max-width: 480px) {
-    :root {
-        --card-max-width: 340px;
-    }
-    
-    .swipe-card {
-        height: 450px;
-    }
-    
     .card-title {
         font-size: 20px;
     }
@@ -518,13 +509,7 @@ html, body {
 }
 
 @media (max-width: 360px) {
-    :root {
-        --card-max-width: 300px;
-    }
-    
-    .swipe-card {
-        height: 400px;
-    }
+    /* Additional mobile-specific styles can be added here if needed */
 }
 
 /* ===============
