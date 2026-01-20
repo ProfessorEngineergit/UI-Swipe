@@ -140,7 +140,7 @@ html, body {
     align-items: center;
     justify-content: center;
     perspective: 1000px;
-    padding: 20px;
+    padding: 0;
 }
 
 /* ============
@@ -149,10 +149,9 @@ html, body {
 .swipe-card {
     position: absolute;
     width: 100%;
-    max-width: var(--card-max-width);
-    height: 500px;
+    height: 100%;
     background: var(--bg-card);
-    border-radius: 24px;
+    border-radius: 0;
     box-shadow: 
         0 20px 60px rgba(0, 0, 0, 0.4),
         0 0 100px rgba(99, 102, 241, 0.1);
@@ -443,17 +442,16 @@ html, body {
 
 .hint-arrow {
     font-size: 32px;
-    animation: bounce-horizontal 1.5s ease-in-out infinite;
+    animation: bounce-vertical 1.5s ease-in-out infinite;
 }
 
-.hint-arrow.left {
-    color: var(--accent-dislike);
-    animation-delay: 0s;
+.hint-arrow.down {
+    color: var(--accent-primary);
 }
 
-.hint-arrow.right {
-    color: var(--accent-like);
-    animation-delay: 0.75s;
+@keyframes bounce-vertical {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(8px) scale(1.1); }
 }
 
 .hint-text {
@@ -470,20 +468,6 @@ html, body {
 @keyframes float {
     0%, 100% { transform: translateX(-50%) translateY(0); }
     50% { transform: translateX(-50%) translateY(-8px); }
-}
-
-@keyframes bounce-horizontal {
-    0%, 100% { transform: translateX(0) scale(1); }
-    50% { transform: translateX(-4px) scale(1.1); }
-}
-
-.hint-arrow.right {
-    animation-name: bounce-horizontal-right;
-}
-
-@keyframes bounce-horizontal-right {
-    0%, 100% { transform: translateX(0) scale(1); }
-    50% { transform: translateX(4px) scale(1.1); }
 }
 
 /* ==========

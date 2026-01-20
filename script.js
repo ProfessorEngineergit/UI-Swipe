@@ -34,8 +34,7 @@ class APIService {
      * @returns {Promise<Array>} Array of card data
      */
     async fetchCards(limit = 10) {
-        const start = (this.page - 1) * limit;
-        const url = `${this.apiUrl}?_start=${start}&_limit=${limit}`;
+        const url = `${this.apiUrl}?page=${this.page}&limit=${limit}`;
         
         try {
             // Check cache first
@@ -56,13 +55,14 @@ class APIService {
                 
                 const data = await response.json();
                 
-                // Transform API data to card format
+                // Transform Picsum API data to card format
+                // Picsum returns: [{ id, author, width, height, url, download_url }, ...]
                 const cards = data.map(item => ({
                     id: item.id,
-                    title: item.title,
-                    description: `Photo ID: ${item.id}`,
-                    imageUrl: item.url,
-                    thumbnailUrl: item.thumbnailUrl
+                    title: item.author,
+                    description: `Photo by ${item.author} - ${item.width}x${item.height}`,
+                    imageUrl: item.download_url,
+                    thumbnailUrl: item.download_url
                 }));
                 
                 // Cache the result
@@ -73,6 +73,7 @@ class APIService {
             } catch (fetchError) {
                 console.warn('⚠️ API fetch failed, using mock data:', fetchError.message);
                 // Fallback to mock data if API fails
+                const start = (this.page - 1) * limit;
                 return this.generateMockCards(start, limit);
             }
         } catch (error) {
@@ -258,30 +259,19 @@ class SwipeController {
         if (!this.isDragging || !this.currentCard) return;
         
         const point = e.touches ? e.touches[0] : e;
-        this.currentX = point.clientX - this.startX;
+        this.currentX = 0; // Force horizontal to 0 - only vertical swipe allowed
         this.currentY = point.clientY - this.startY;
         
-        // Calculate rotation based on horizontal movement
-        const rotation = (this.currentX / window.innerWidth) * this.options.rotation;
-        
-        // Apply transform
-        this.currentCard.style.transform = `
-            translate(${this.currentX}px, ${this.currentY}px) 
-            rotate(${rotation}deg)
-        `;
-        
-        // Show indicators
-        if (Math.abs(this.currentX) > 50) {
-            if (this.currentX > 0) {
-                this.currentCard.classList.add('show-like');
-                this.currentCard.classList.remove('show-nope');
-            } else {
-                this.currentCard.classList.add('show-nope');
-                this.currentCard.classList.remove('show-like');
-            }
-        } else {
-            this.currentCard.classList.remove('show-like', 'show-nope');
+        // Only allow downward movement (positive Y)
+        if (this.currentY < 0) {
+            this.currentY = 0;
         }
+        
+        // Apply transform - only vertical translation, no rotation
+        this.currentCard.style.transform = `translate(0px, ${this.currentY}px)`;
+        
+        // Hide like/nope indicators since we only swipe down
+        this.currentCard.classList.remove('show-like', 'show-nope');
         
         if (e.type === 'touchmove') {
             e.preventDefault();
@@ -296,10 +286,10 @@ class SwipeController {
         
         const threshold = this.options.threshold;
         
-        // Check if swipe was strong enough
-        if (Math.abs(this.currentX) > threshold) {
-            // Complete the swipe
-            this.completeSwipe(this.currentX > 0);
+        // Check if downward swipe was strong enough
+        if (this.currentY > threshold) {
+            // Complete the swipe (swipe down to proceed)
+            this.completeSwipe(true);
         } else {
             // Reset card position
             this.resetCard();
@@ -310,22 +300,17 @@ class SwipeController {
         if (!this.currentCard) return;
         
         const card = this.currentCard;
-        const direction = isLike ? 1 : -1;
-        const endX = direction * window.innerWidth * 1.5;
-        const endY = this.currentY;
+        // Vertical exit animation - slide down
+        const endY = window.innerHeight * 1.5;
         
         card.classList.add('removing');
         card.classList.remove('swiping', 'show-like', 'show-nope');
-        card.style.transform = `translate(${endX}px, ${endY}px) rotate(${direction * 30}deg)`;
+        card.style.transform = `translate(0px, ${endY}px)`;
         card.style.opacity = '0';
         
-        // Trigger callback
+        // Trigger callback - always use onSwipeRight for "next" action
         setTimeout(() => {
-            if (isLike) {
-                this.options.onSwipeRight(card);
-            } else {
-                this.options.onSwipeLeft(card);
-            }
+            this.options.onSwipeRight(card);
         }, 100);
     }
 
@@ -347,9 +332,9 @@ class SwipeController {
         if (!card) return;
         
         this.currentCard = card;
-        this.currentX = direction === 'right' ? 200 : -200;
-        this.currentY = 0;
-        this.completeSwipe(direction === 'right');
+        this.currentX = 0;
+        this.currentY = 200; // Swipe down
+        this.completeSwipe(true);
     }
 }
 
@@ -546,7 +531,7 @@ class SwipeApp {
         this.swipeHint = document.getElementById('swipeHint');
         
         // Initialize services
-        this.apiService = new APIService('https://jsonplaceholder.typicode.com/photos');
+        this.apiService = new APIService('https://picsum.photos/v2/list');
         
         // Initialize swipe controller
         this.swipeController = new SwipeController(this.container, {
@@ -583,12 +568,12 @@ class SwipeApp {
 
     setupButtonHandlers() {
         this.likeBtn.addEventListener('click', () => {
-            this.swipeController.swipe('right');
+            this.swipeController.swipe('down');
             this.vibrateIfSupported(30);
         });
         
         this.dislikeBtn.addEventListener('click', () => {
-            this.swipeController.swipe('left');
+            this.swipeController.swipe('down');
             this.vibrateIfSupported(30);
         });
     }
