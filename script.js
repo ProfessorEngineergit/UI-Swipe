@@ -207,7 +207,6 @@ class SwipeController {
         this.container = containerElement;
         this.options = {
             threshold: 100, // Swipe threshold in pixels
-            rotation: 15,   // Max rotation in degrees (unused in vertical-only mode)
             onSwipe: () => {}, // Callback for swipe completion
             ...options
         };
@@ -288,14 +287,14 @@ class SwipeController {
         // Check if downward swipe was strong enough
         if (this.currentY > threshold) {
             // Complete the swipe (swipe down to proceed)
-            this.completeSwipe(true);
+            this.completeSwipe();
         } else {
             // Reset card position
             this.resetCard();
         }
     }
 
-    completeSwipe(isLike) {
+    completeSwipe() {
         if (!this.currentCard) return;
         
         const card = this.currentCard;
@@ -333,7 +332,7 @@ class SwipeController {
         this.currentCard = card;
         this.currentX = 0;
         this.currentY = 200; // Swipe down
-        this.completeSwipe(true);
+        this.completeSwipe();
     }
 }
 
@@ -535,7 +534,6 @@ class SwipeApp {
         // Initialize swipe controller
         this.swipeController = new SwipeController(this.container, {
             threshold: 100,
-            rotation: 15,
             onSwipe: (card) => this.handleSwipe(card)
         });
         
