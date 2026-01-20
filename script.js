@@ -1,508 +1,635 @@
-// UI Swipe - Satisfying UI Components
-// Disable zoom gestures
-let lastTouchEnd = 0;
-document.addEventListener('touchend', (e) => {
-    const now = Date.now();
-    if (now - lastTouchEnd <= 300) e.preventDefault();
-    lastTouchEnd = now;
-}, false);
+/**
+ * API-Based Swipe App
+ * Modern card-based swipe application with infinite loading
+ */
 
-document.addEventListener('gesturestart', e => e.preventDefault());
-document.addEventListener('gesturechange', e => e.preventDefault());
-document.addEventListener('gestureend', e => e.preventDefault());
+// ===========================
+// Utility Functions
+// ===========================
 
-// Sound effects using Web Audio API
-const AudioContext = window.AudioContext || window.webkitAudioContext;
-let audioCtx = null;
-let soundEnabled = true;
+/**
+ * Sanitize HTML to prevent XSS attacks
+ * @param {string} str - String to sanitize
+ * @returns {string} Sanitized string
+ */
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
 
-function initAudio() {
-    if (!audioCtx) {
-        audioCtx = new AudioContext();
+// ===========================
+// API Service Class
+// ===========================
+class APIService {
+    constructor(apiUrl) {
+        this.apiUrl = apiUrl;
+        this.page = 1;
+        this.cache = new Map();
+    }
+
+    /**
+     * Fetch cards from API with pagination
+     * @param {number} limit - Number of cards to fetch
+     * @returns {Promise<Array>} Array of card data
+     */
+    async fetchCards(limit = 10) {
+        const start = (this.page - 1) * limit;
+        const url = `${this.apiUrl}?_start=${start}&_limit=${limit}`;
+        
+        try {
+            // Check cache first
+            if (this.cache.has(url)) {
+                console.log('📦 Returning cached data for page', this.page);
+                this.page++;
+                return this.cache.get(url);
+            }
+
+            console.log(`🌐 Fetching page ${this.page} from API...`);
+            
+            try {
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Transform API data to card format
+                const cards = data.map(item => ({
+                    id: item.id,
+                    title: item.title,
+                    description: `Photo ID: ${item.id}`,
+                    imageUrl: item.url,
+                    thumbnailUrl: item.thumbnailUrl
+                }));
+                
+                // Cache the result
+                this.cache.set(url, cards);
+                this.page++;
+                
+                return cards;
+            } catch (fetchError) {
+                console.warn('⚠️ API fetch failed, using mock data:', fetchError.message);
+                // Fallback to mock data if API fails
+                return this.generateMockCards(start, limit);
+            }
+        } catch (error) {
+            console.error('❌ Error fetching cards:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Generate mock cards for fallback
+     * @param {number} start - Starting ID
+     * @param {number} limit - Number of cards to generate
+     * @returns {Array} Array of mock card data
+     */
+    generateMockCards(start, limit) {
+        const colors = [
+            'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+            'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+            'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+            'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+            'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
+            'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+            'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
+            'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+            'linear-gradient(135deg, #ff6e7f 0%, #bfe9ff 100%)'
+        ];
+        
+        const titles = [
+            'Beautiful Sunset',
+            'Mountain Peak',
+            'Ocean Waves',
+            'City Lights',
+            'Forest Path',
+            'Desert Dunes',
+            'Northern Lights',
+            'Tropical Paradise',
+            'Snowy Mountains',
+            'Autumn Leaves'
+        ];
+        
+        const cards = [];
+        for (let i = 0; i < limit; i++) {
+            const id = start + i + 1;
+            const colorIndex = (id - 1) % colors.length;
+            const titleIndex = (id - 1) % titles.length;
+            
+            cards.push({
+                id: id,
+                title: `${titles[titleIndex]} #${id}`,
+                description: `Beautiful API-generated image from placeholder`,
+                imageUrl: this.createMockImage(colors[colorIndex], id),
+                thumbnailUrl: this.createMockImage(colors[colorIndex], id)
+            });
+        }
+        
+        this.page++;
+        return cards;
+    }
+
+    /**
+     * Create a mock image with gradient and text
+     * @param {string} gradient - CSS gradient
+     * @param {number} id - Card ID
+     * @returns {string} Data URL
+     */
+    createMockImage(gradient, id) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 600;
+        canvas.height = 800;
+        const ctx = canvas.getContext('2d');
+        
+        // Gradient color map
+        const gradientMap = {
+            '#667eea': { start: '#667eea', end: '#764ba2' },
+            '#f093fb': { start: '#f093fb', end: '#f5576c' },
+            '#4facfe': { start: '#4facfe', end: '#00f2fe' },
+            '#43e97b': { start: '#43e97b', end: '#38f9d7' },
+            '#fa709a': { start: '#fa709a', end: '#fee140' },
+            '#30cfd0': { start: '#30cfd0', end: '#330867' },
+            '#a8edea': { start: '#a8edea', end: '#fed6e3' },
+            '#ff9a9e': { start: '#ff9a9e', end: '#fecfef' },
+            '#ffecd2': { start: '#ffecd2', end: '#fcb69f' },
+            '#ff6e7f': { start: '#ff6e7f', end: '#bfe9ff' }
+        };
+        
+        // Find matching gradient or use default
+        let colors = { start: '#ff6e7f', end: '#bfe9ff' };
+        for (const [key, value] of Object.entries(gradientMap)) {
+            if (gradient.includes(key)) {
+                colors = value;
+                break;
+            }
+        }
+        
+        // Create gradient background
+        const gradientObj = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        gradientObj.addColorStop(0, colors.start);
+        gradientObj.addColorStop(1, colors.end);
+        
+        ctx.fillStyle = gradientObj;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Add text
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.font = 'bold 60px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`Card #${id}`, canvas.width / 2, canvas.height / 2);
+        
+        // Add decorative icon
+        ctx.font = '80px Arial';
+        ctx.fillText('🎴', canvas.width / 2, canvas.height / 2 - 100);
+        
+        return canvas.toDataURL('image/png');
+    }
+
+    /**
+     * Reset pagination to start
+     */
+    reset() {
+        this.page = 1;
     }
 }
 
-function playSound(type) {
-    if (!soundEnabled || !audioCtx) return;
-    
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    
-    const sounds = {
-        click: { freq: 800, duration: 0.08, type: 'sine' },
-        toggle: { freq: 600, duration: 0.12, type: 'sine' },
-        success: { freq: 880, duration: 0.15, type: 'sine' },
-        pop: { freq: 400, duration: 0.06, type: 'triangle' },
-        slide: { freq: 300, duration: 0.1, type: 'sine' },
-        flip: { freq: 500, duration: 0.2, type: 'triangle' }
-    };
-    
-    const sound = sounds[type] || sounds.click;
-    oscillator.type = sound.type;
-    oscillator.frequency.setValueAtTime(sound.freq, audioCtx.currentTime);
-    
-    gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + sound.duration);
-    
-    oscillator.start(audioCtx.currentTime);
-    oscillator.stop(audioCtx.currentTime + sound.duration);
-}
-
-// UI Components Data
-const components = [
-    {
-        id: 'toggle-neon',
-        name: 'Neon Toggle',
-        description: 'Glühender Neon-Effekt beim Umschalten',
-        category: 'toggles',
-        html: `
-            <div class="toggle-neon">
-                <input type="checkbox" id="toggle-neon-1">
-                <label for="toggle-neon-1"></label>
-            </div>
-        `,
-        sound: 'toggle'
-    },
-    {
-        id: 'toggle-liquid',
-        name: 'Liquid Toggle',
-        description: 'Flüssige Animation mit Farbverlauf',
-        category: 'toggles',
-        html: `
-            <div class="toggle-liquid">
-                <input type="checkbox" id="toggle-liquid-1">
-                <label for="toggle-liquid-1"></label>
-            </div>
-        `,
-        sound: 'toggle'
-    },
-    {
-        id: 'toggle-daynight',
-        name: 'Day/Night Toggle',
-        description: 'Wechsel zwischen Tag und Nacht',
-        category: 'toggles',
-        html: `
-            <div class="toggle-daynight">
-                <input type="checkbox" id="toggle-daynight-1">
-                <label for="toggle-daynight-1"></label>
-            </div>
-        `,
-        sound: 'toggle'
-    },
-    {
-        id: 'btn-glow',
-        name: 'Glow Button',
-        description: 'Pulsierender Leuchteffekt beim Hover',
-        category: 'buttons',
-        html: `<button class="btn-glow">Click Me</button>`,
-        sound: 'click'
-    },
-    {
-        id: 'btn-ripple',
-        name: 'Ripple Button',
-        description: 'Wellen-Effekt bei jedem Klick',
-        category: 'buttons',
-        html: `<button class="btn-ripple">Click Me</button>`,
-        sound: 'pop'
-    },
-    {
-        id: 'btn-3d',
-        name: '3D Press Button',
-        description: 'Physischer 3D-Drück-Effekt',
-        category: 'buttons',
-        html: `<button class="btn-3d">Press Me</button>`,
-        sound: 'click'
-    },
-    {
-        id: 'checkbox-bounce',
-        name: 'Bounce Checkbox',
-        description: 'Federnde Check-Animation',
-        category: 'checkboxes',
-        html: `
-            <div class="checkbox-bounce">
-                <input type="checkbox" id="cb-bounce-1">
-                <label for="cb-bounce-1"></label>
-            </div>
-        `,
-        sound: 'success'
-    },
-    {
-        id: 'checkbox-fill',
-        name: 'Fill Checkbox',
-        description: 'Ausfüllende Kreis-Animation',
-        category: 'checkboxes',
-        html: `
-            <div class="checkbox-fill">
-                <input type="checkbox" id="cb-fill-1">
-                <label for="cb-fill-1"></label>
-            </div>
-        `,
-        sound: 'success'
-    },
-    {
-        id: 'checkbox-morph',
-        name: 'Morph Checkbox',
-        description: 'X verwandelt sich in Häkchen',
-        category: 'checkboxes',
-        html: `
-            <div class="checkbox-morph">
-                <input type="checkbox" id="cb-morph-1">
-                <label for="cb-morph-1"></label>
-            </div>
-        `,
-        sound: 'success'
-    },
-    {
-        id: 'slider-gradient',
-        name: 'Gradient Slider',
-        description: 'Farbverlauf mit leuchtendem Knopf',
-        category: 'sliders',
-        html: `
-            <div class="slider-gradient">
-                <input type="range" min="0" max="100" value="50">
-            </div>
-        `,
-        sound: 'slide'
-    },
-    {
-        id: 'slider-bubble',
-        name: 'Bubble Slider',
-        description: 'Wert-Anzeige folgt dem Slider',
-        category: 'sliders',
-        html: `
-            <div class="slider-bubble">
-                <span class="slider-bubble-value">50</span>
-                <input type="range" min="0" max="100" value="50">
-            </div>
-        `,
-        sound: 'slide'
-    },
-    {
-        id: 'loader-orbit',
-        name: 'Orbit Loader',
-        description: 'Doppelte rotierende Ringe',
-        category: 'loaders',
-        html: `<div class="loader-orbit"></div>`
-    },
-    {
-        id: 'loader-dots',
-        name: 'Wave Dots',
-        description: 'Pulsierende Punkte-Animation',
-        category: 'loaders',
-        html: `
-            <div class="loader-dots">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
-        `
-    },
-    {
-        id: 'loader-pulse',
-        name: 'Pulse Ring',
-        description: 'Ausbreitende Puls-Ringe',
-        category: 'loaders',
-        html: `<div class="loader-pulse"></div>`
-    },
-    {
-        id: 'card-tilt',
-        name: '3D Tilt Card',
-        description: 'Folgt deiner Maus/Touch-Bewegung',
-        category: 'cards',
-        html: `
-            <div class="card-tilt" data-tilt>
-                <div class="card-tilt-content">
-                    <span class="card-tilt-icon">🎴</span>
-                    <span>Bewege mich!</span>
-                </div>
-            </div>
-        `
-    },
-    {
-        id: 'card-flip',
-        name: 'Flip Card',
-        description: 'Tippe zum Umdrehen',
-        category: 'cards',
-        html: `
-            <div class="card-flip" data-flip>
-                <div class="card-flip-inner">
-                    <div class="card-flip-front">
-                        <span class="card-flip-icon">✨</span>
-                        <span>Vorderseite</span>
-                    </div>
-                    <div class="card-flip-back">
-                        <span class="card-flip-icon">🎉</span>
-                        <span>Rückseite!</span>
-                    </div>
-                </div>
-            </div>
-        `,
-        sound: 'flip'
-    },
-    {
-        id: 'card-glow',
-        name: 'Glow Border Card',
-        description: 'Animierter Leuchtrand beim Hover',
-        category: 'cards',
-        html: `
-            <div class="card-glow">
-                <span class="card-glow-icon">💎</span>
-                <span>Hover me!</span>
-            </div>
-        `
+// ===========================
+// Swipe Controller Class
+// ===========================
+class SwipeController {
+    constructor(containerElement, options = {}) {
+        this.container = containerElement;
+        this.options = {
+            threshold: 100, // Swipe threshold in pixels
+            rotation: 15,   // Max rotation in degrees
+            onSwipeLeft: () => {},
+            onSwipeRight: () => {},
+            ...options
+        };
+        
+        this.currentCard = null;
+        this.startX = 0;
+        this.startY = 0;
+        this.currentX = 0;
+        this.currentY = 0;
+        this.isDragging = false;
+        
+        this.init();
     }
-];
 
-// State
-let currentIndex = 0;
-let filteredComponents = [...components];
-let currentCategory = 'all';
+    init() {
+        // Touch events
+        this.container.addEventListener('touchstart', this.handleStart.bind(this), { passive: false });
+        this.container.addEventListener('touchmove', this.handleMove.bind(this), { passive: false });
+        this.container.addEventListener('touchend', this.handleEnd.bind(this));
+        
+        // Mouse events
+        this.container.addEventListener('mousedown', this.handleStart.bind(this));
+        this.container.addEventListener('mousemove', this.handleMove.bind(this));
+        this.container.addEventListener('mouseup', this.handleEnd.bind(this));
+        this.container.addEventListener('mouseleave', this.handleEnd.bind(this));
+    }
 
-// DOM Elements
-const container = document.getElementById('componentContainer');
-const navDots = document.getElementById('navDots');
-const swipeHint = document.getElementById('swipeHint');
-const categoryNav = document.getElementById('categoryNav');
-const soundToggle = document.getElementById('soundToggle');
-const currentCategoryDisplay = document.getElementById('currentCategory');
+    handleStart(e) {
+        // Only handle first card
+        const card = this.container.querySelector('.swipe-card:first-child');
+        if (!card) return;
+        
+        this.currentCard = card;
+        this.isDragging = true;
+        
+        const point = e.touches ? e.touches[0] : e;
+        this.startX = point.clientX;
+        this.startY = point.clientY;
+        
+        card.classList.add('grabbing', 'swiping');
+        
+        if (e.type === 'touchstart') {
+            e.preventDefault();
+        }
+    }
 
-// Initialize
-function init() {
-    initAudio();
-    renderComponents();
-    setupEventListeners();
-    updateNavDots();
-    
-    // Hide swipe hint after 4 seconds
-    setTimeout(() => {
-        swipeHint.classList.add('hidden');
-    }, 4000);
+    handleMove(e) {
+        if (!this.isDragging || !this.currentCard) return;
+        
+        const point = e.touches ? e.touches[0] : e;
+        this.currentX = point.clientX - this.startX;
+        this.currentY = point.clientY - this.startY;
+        
+        // Calculate rotation based on horizontal movement
+        const rotation = (this.currentX / window.innerWidth) * this.options.rotation;
+        
+        // Apply transform
+        this.currentCard.style.transform = `
+            translate(${this.currentX}px, ${this.currentY}px) 
+            rotate(${rotation}deg)
+        `;
+        
+        // Show indicators
+        if (Math.abs(this.currentX) > 50) {
+            if (this.currentX > 0) {
+                this.currentCard.classList.add('show-like');
+                this.currentCard.classList.remove('show-nope');
+            } else {
+                this.currentCard.classList.add('show-nope');
+                this.currentCard.classList.remove('show-like');
+            }
+        } else {
+            this.currentCard.classList.remove('show-like', 'show-nope');
+        }
+        
+        if (e.type === 'touchmove') {
+            e.preventDefault();
+        }
+    }
+
+    handleEnd(e) {
+        if (!this.isDragging || !this.currentCard) return;
+        
+        this.isDragging = false;
+        this.currentCard.classList.remove('grabbing');
+        
+        const threshold = this.options.threshold;
+        
+        // Check if swipe was strong enough
+        if (Math.abs(this.currentX) > threshold) {
+            // Complete the swipe
+            this.completeSwipe(this.currentX > 0);
+        } else {
+            // Reset card position
+            this.resetCard();
+        }
+    }
+
+    completeSwipe(isLike) {
+        if (!this.currentCard) return;
+        
+        const card = this.currentCard;
+        const direction = isLike ? 1 : -1;
+        const endX = direction * window.innerWidth * 1.5;
+        const endY = this.currentY;
+        
+        card.classList.add('removing');
+        card.classList.remove('swiping', 'show-like', 'show-nope');
+        card.style.transform = `translate(${endX}px, ${endY}px) rotate(${direction * 30}deg)`;
+        card.style.opacity = '0';
+        
+        // Trigger callback
+        setTimeout(() => {
+            if (isLike) {
+                this.options.onSwipeRight(card);
+            } else {
+                this.options.onSwipeLeft(card);
+            }
+        }, 100);
+    }
+
+    resetCard() {
+        if (!this.currentCard) return;
+        
+        this.currentCard.classList.remove('swiping', 'show-like', 'show-nope');
+        this.currentCard.style.transform = '';
+        this.currentCard = null;
+        this.currentX = 0;
+        this.currentY = 0;
+    }
+
+    /**
+     * Programmatically trigger swipe
+     */
+    swipe(direction) {
+        const card = this.container.querySelector('.swipe-card:first-child');
+        if (!card) return;
+        
+        this.currentCard = card;
+        this.currentX = direction === 'right' ? 200 : -200;
+        this.currentY = 0;
+        this.completeSwipe(direction === 'right');
+    }
 }
 
-// Render all components
-function renderComponents() {
-    container.innerHTML = '';
-    navDots.innerHTML = '';
-    
-    filteredComponents.forEach((comp, index) => {
-        // Create card
+// ===========================
+// Card Manager Class
+// ===========================
+class CardManager {
+    constructor(container, apiService, swipeController) {
+        this.container = container;
+        this.apiService = apiService;
+        this.swipeController = swipeController;
+        this.cards = [];
+        this.swipeCount = 0;
+        this.isLoading = false;
+        this.minStackSize = 3;
+        this.initialLoadSize = 5;
+        this.batchSize = 5;
+    }
+
+    /**
+     * Initialize the card manager
+     */
+    async init() {
+        await this.loadInitialCards();
+        this.updateSwipeCount();
+    }
+
+    /**
+     * Load initial set of cards
+     */
+    async loadInitialCards() {
+        this.showLoading();
+        try {
+            const newCards = await this.apiService.fetchCards(this.initialLoadSize);
+            this.cards.push(...newCards);
+            this.renderCards();
+        } catch (error) {
+            console.error('Failed to load initial cards:', error);
+            this.showError('Failed to load cards. Please refresh.');
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    /**
+     * Load more cards when stack is low
+     */
+    async loadMoreCards() {
+        if (this.isLoading || this.cards.length >= this.minStackSize) return;
+        
+        this.isLoading = true;
+        this.showLoading();
+        
+        try {
+            console.log('📥 Loading more cards...');
+            const newCards = await this.apiService.fetchCards(this.batchSize);
+            this.cards.push(...newCards);
+            this.renderCards();
+            console.log(`✅ Loaded ${newCards.length} new cards. Total: ${this.cards.length}`);
+        } catch (error) {
+            console.error('Failed to load more cards:', error);
+        } finally {
+            this.isLoading = false;
+            this.hideLoading();
+        }
+    }
+
+    /**
+     * Render all cards in the stack
+     */
+    renderCards() {
+        // Keep existing cards, only add new ones
+        const existingIds = new Set(
+            Array.from(this.container.querySelectorAll('.swipe-card'))
+                .map(card => card.dataset.id)
+        );
+        
+        this.cards.forEach((cardData, index) => {
+            if (existingIds.has(String(cardData.id))) return;
+            
+            const card = this.createCardElement(cardData);
+            this.container.appendChild(card);
+        });
+    }
+
+    /**
+     * Create a card DOM element
+     */
+    createCardElement(data) {
         const card = document.createElement('div');
-        card.className = 'component-card';
-        card.dataset.index = index;
+        card.className = 'swipe-card';
+        card.dataset.id = data.id;
+        
+        // Sanitize user-provided data
+        const safeTitle = escapeHtml(this.truncate(data.title, 50));
+        const safeDescription = escapeHtml(data.description);
+        const safeImageUrl = escapeHtml(data.imageUrl);
+        
         card.innerHTML = `
-            <div class="component-wrapper">
-                <div class="component-display">
-                    ${comp.html}
-                </div>
-                <div class="component-info">
-                    <div class="component-name">${comp.name}</div>
-                    <div class="component-description">${comp.description}</div>
-                    <span class="component-tag">${comp.category}</span>
-                </div>
+            <img src="${safeImageUrl}" alt="${safeTitle}" class="card-image" loading="lazy">
+            <div class="card-id">#${data.id}</div>
+            <div class="swipe-indicator like">LIKE</div>
+            <div class="swipe-indicator nope">NOPE</div>
+            <div class="card-overlay">
+                <h2 class="card-title">${safeTitle}</h2>
+                <p class="card-description">${safeDescription}</p>
             </div>
         `;
-        container.appendChild(card);
         
-        // Create nav dot
-        const dot = document.createElement('div');
-        dot.className = 'nav-dot';
-        dot.dataset.index = index;
-        dot.addEventListener('click', () => scrollToComponent(index));
-        navDots.appendChild(dot);
-    });
-    
-    setupComponentInteractions();
-}
+        return card;
+    }
 
-// Setup component-specific interactions
-function setupComponentInteractions() {
-    // Ripple buttons
-    document.querySelectorAll('.btn-ripple').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-            const ripple = document.createElement('span');
-            ripple.className = 'ripple';
-            const rect = this.getBoundingClientRect();
-            const size = Math.max(rect.width, rect.height);
-            ripple.style.width = ripple.style.height = size + 'px';
-            ripple.style.left = (e.clientX - rect.left - size/2) + 'px';
-            ripple.style.top = (e.clientY - rect.top - size/2) + 'px';
-            this.appendChild(ripple);
-            playSound('pop');
-            setTimeout(() => ripple.remove(), 600);
-        });
-    });
-    
-    // Regular buttons
-    document.querySelectorAll('.btn-glow, .btn-3d').forEach(btn => {
-        btn.addEventListener('click', () => playSound('click'));
-    });
-    
-    // Toggles
-    document.querySelectorAll('.toggle-neon input, .toggle-liquid input, .toggle-daynight input').forEach(toggle => {
-        toggle.addEventListener('change', () => {
-            playSound('toggle');
-            if (navigator.vibrate) navigator.vibrate(30);
-        });
-    });
-    
-    // Checkboxes
-    document.querySelectorAll('.checkbox-bounce input, .checkbox-fill input, .checkbox-morph input').forEach(cb => {
-        cb.addEventListener('change', () => {
-            playSound('success');
-            if (navigator.vibrate) navigator.vibrate(20);
-        });
-    });
-    
-    // Sliders
-    document.querySelectorAll('.slider-gradient input, .slider-bubble input').forEach(slider => {
-        let lastSoundTime = 0;
-        slider.addEventListener('input', function() {
-            const now = Date.now();
-            if (now - lastSoundTime > 100) {
-                playSound('slide');
-                lastSoundTime = now;
-            }
+    /**
+     * Handle card removal after swipe
+     */
+    removeCard(card) {
+        // Remove from DOM after animation
+        setTimeout(() => {
+            card.remove();
             
-            // Update bubble value if exists
-            const bubble = this.parentElement.querySelector('.slider-bubble-value');
-            if (bubble) {
-                bubble.textContent = this.value;
-                const percent = (this.value - this.min) / (this.max - this.min);
-                const thumbWidth = 20;
-                const trackWidth = this.offsetWidth - thumbWidth;
-                bubble.style.left = (percent * trackWidth + thumbWidth/2) + 'px';
-            }
-        });
-    });
-    
-    // 3D Tilt cards
-    document.querySelectorAll('[data-tilt]').forEach(card => {
-        card.addEventListener('mousemove', handleTilt);
-        card.addEventListener('touchmove', handleTilt);
-        card.addEventListener('mouseleave', resetTilt);
-        card.addEventListener('touchend', resetTilt);
-    });
-    
-    // Flip cards
-    document.querySelectorAll('[data-flip]').forEach(card => {
-        card.addEventListener('click', () => {
-            card.classList.toggle('flipped');
-            playSound('flip');
-            if (navigator.vibrate) navigator.vibrate(40);
-        });
-    });
-}
-
-// Handle 3D tilt effect
-function handleTilt(e) {
-    const card = e.currentTarget;
-    const rect = card.getBoundingClientRect();
-    
-    let x, y;
-    if (e.touches) {
-        x = e.touches[0].clientX - rect.left;
-        y = e.touches[0].clientY - rect.top;
-    } else {
-        x = e.clientX - rect.left;
-        y = e.clientY - rect.top;
-    }
-    
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const rotateX = (y - centerY) / 10;
-    const rotateY = (centerX - x) / 10;
-    
-    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.05, 1.05, 1.05)`;
-}
-
-function resetTilt(e) {
-    e.currentTarget.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
-}
-
-// Setup event listeners
-function setupEventListeners() {
-    // Scroll detection for nav dots
-    container.addEventListener('scroll', () => {
-        const cardHeight = container.firstElementChild?.offsetHeight || 0;
-        if (cardHeight > 0) {
-            currentIndex = Math.round(container.scrollTop / cardHeight);
-            updateNavDots();
-            updateCategoryDisplay();
-        }
-    });
-    
-    // Category filter
-    categoryNav.addEventListener('click', (e) => {
-        if (e.target.classList.contains('category-btn')) {
-            document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active'));
-            e.target.classList.add('active');
+            // Remove from cards array
+            const cardId = parseInt(card.dataset.id);
+            this.cards = this.cards.filter(c => c.id !== cardId);
             
-            currentCategory = e.target.dataset.category;
-            filterComponents(currentCategory);
-            playSound('click');
+            // Update count
+            this.swipeCount++;
+            this.updateSwipeCount();
+            
+            // Check if we need to load more cards
+            if (this.cards.length < this.minStackSize) {
+                this.loadMoreCards();
+            }
+        }, 300);
+    }
+
+    /**
+     * Update swipe counter display
+     */
+    updateSwipeCount() {
+        const counter = document.getElementById('swipeCount');
+        if (counter) {
+            counter.textContent = this.swipeCount;
+            
+            // Animate counter
+            counter.style.transform = 'scale(1.3)';
+            setTimeout(() => {
+                counter.style.transform = 'scale(1)';
+            }, 200);
         }
-    });
-    
-    // Sound toggle
-    soundToggle.addEventListener('click', () => {
-        initAudio();
-        soundEnabled = !soundEnabled;
-        soundToggle.querySelector('.sound-on').style.display = soundEnabled ? 'block' : 'none';
-        soundToggle.querySelector('.sound-off').style.display = soundEnabled ? 'none' : 'block';
-        if (soundEnabled) playSound('click');
-    });
-    
-    // Enable audio on first user interaction
-    document.addEventListener('click', initAudio, { once: true });
-    document.addEventListener('touchstart', initAudio, { once: true });
-}
-
-// Filter components by category
-function filterComponents(category) {
-    if (category === 'all') {
-        filteredComponents = [...components];
-    } else {
-        filteredComponents = components.filter(c => c.category === category);
     }
-    currentIndex = 0;
-    renderComponents();
-    updateNavDots();
-    updateCategoryDisplay();
-}
 
-// Scroll to specific component
-function scrollToComponent(index) {
-    const cardHeight = container.firstElementChild?.offsetHeight || 0;
-    container.scrollTo({
-        top: index * cardHeight,
-        behavior: 'smooth'
-    });
-    playSound('click');
-}
+    /**
+     * Show loading indicator
+     */
+    showLoading() {
+        const loader = document.getElementById('loadingIndicator');
+        if (loader) loader.classList.add('visible');
+    }
 
-// Update navigation dots
-function updateNavDots() {
-    document.querySelectorAll('.nav-dot').forEach((dot, i) => {
-        dot.classList.toggle('active', i === currentIndex);
-    });
-}
+    /**
+     * Hide loading indicator
+     */
+    hideLoading() {
+        const loader = document.getElementById('loadingIndicator');
+        if (loader) loader.classList.remove('visible');
+    }
 
-// Update category display in header
-function updateCategoryDisplay() {
-    if (filteredComponents[currentIndex]) {
-        const category = filteredComponents[currentIndex].category;
-        currentCategoryDisplay.textContent = category.charAt(0).toUpperCase() + category.slice(1);
+    /**
+     * Show error message
+     */
+    showError(message) {
+        console.error(message);
+        // Could implement a toast notification here
+    }
+
+    /**
+     * Truncate text to specified length
+     */
+    truncate(text, maxLength) {
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
     }
 }
 
-// Start app
+// ===========================
+// App Initialization
+// ===========================
+class SwipeApp {
+    constructor() {
+        // DOM Elements
+        this.container = document.getElementById('swipeContainer');
+        this.likeBtn = document.getElementById('likeBtn');
+        this.dislikeBtn = document.getElementById('dislikeBtn');
+        this.swipeHint = document.getElementById('swipeHint');
+        
+        // Initialize services
+        this.apiService = new APIService('https://jsonplaceholder.typicode.com/photos');
+        
+        // Initialize swipe controller
+        this.swipeController = new SwipeController(this.container, {
+            threshold: 100,
+            rotation: 15,
+            onSwipeLeft: (card) => this.handleSwipeLeft(card),
+            onSwipeRight: (card) => this.handleSwipeRight(card)
+        });
+        
+        // Initialize card manager
+        this.cardManager = new CardManager(
+            this.container,
+            this.apiService,
+            this.swipeController
+        );
+        
+        this.init();
+    }
+
+    async init() {
+        console.log('🚀 Initializing Swipe App...');
+        
+        // Load initial cards
+        await this.cardManager.init();
+        
+        // Setup button handlers
+        this.setupButtonHandlers();
+        
+        // Show hint for a few seconds
+        this.showSwipeHint();
+        
+        console.log('✅ Swipe App initialized!');
+    }
+
+    setupButtonHandlers() {
+        this.likeBtn.addEventListener('click', () => {
+            this.swipeController.swipe('right');
+            this.vibrateIfSupported(30);
+        });
+        
+        this.dislikeBtn.addEventListener('click', () => {
+            this.swipeController.swipe('left');
+            this.vibrateIfSupported(30);
+        });
+    }
+
+    handleSwipeLeft(card) {
+        console.log('👎 Swiped left on card', card.dataset.id);
+        this.cardManager.removeCard(card);
+        this.vibrateIfSupported(20);
+    }
+
+    handleSwipeRight(card) {
+        console.log('👍 Swiped right on card', card.dataset.id);
+        this.cardManager.removeCard(card);
+        this.vibrateIfSupported(20);
+    }
+
+    showSwipeHint() {
+        if (this.swipeHint) {
+            this.swipeHint.classList.add('visible');
+            
+            setTimeout(() => {
+                this.swipeHint.classList.remove('visible');
+                this.swipeHint.classList.add('hidden');
+            }, 4000);
+        }
+    }
+
+    vibrateIfSupported(duration) {
+        if (navigator.vibrate) {
+            navigator.vibrate(duration);
+        }
+    }
+}
+
+// ===========================
+// Start the App
+// ===========================
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', () => {
+        new SwipeApp();
+    });
 } else {
-    init();
+    new SwipeApp();
 }
-
-console.log('✨ UI Swipe loaded!');
