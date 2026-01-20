@@ -207,9 +207,8 @@ class SwipeController {
         this.container = containerElement;
         this.options = {
             threshold: 100, // Swipe threshold in pixels
-            rotation: 15,   // Max rotation in degrees
-            onSwipeLeft: () => {},
-            onSwipeRight: () => {},
+            rotation: 15,   // Max rotation in degrees (unused in vertical-only mode)
+            onSwipe: () => {}, // Callback for swipe completion
             ...options
         };
         
@@ -308,9 +307,9 @@ class SwipeController {
         card.style.transform = `translate(0px, ${endY}px)`;
         card.style.opacity = '0';
         
-        // Trigger callback - always use onSwipeRight for "next" action
+        // Trigger callback
         setTimeout(() => {
-            this.options.onSwipeRight(card);
+            this.options.onSwipe(card);
         }, 100);
     }
 
@@ -325,9 +324,9 @@ class SwipeController {
     }
 
     /**
-     * Programmatically trigger swipe
+     * Programmatically trigger swipe (down only)
      */
-    swipe(direction) {
+    swipe() {
         const card = this.container.querySelector('.swipe-card:first-child');
         if (!card) return;
         
@@ -537,8 +536,7 @@ class SwipeApp {
         this.swipeController = new SwipeController(this.container, {
             threshold: 100,
             rotation: 15,
-            onSwipeLeft: (card) => this.handleSwipeLeft(card),
-            onSwipeRight: (card) => this.handleSwipeRight(card)
+            onSwipe: (card) => this.handleSwipe(card)
         });
         
         // Initialize card manager
@@ -568,24 +566,18 @@ class SwipeApp {
 
     setupButtonHandlers() {
         this.likeBtn.addEventListener('click', () => {
-            this.swipeController.swipe('down');
+            this.swipeController.swipe();
             this.vibrateIfSupported(30);
         });
         
         this.dislikeBtn.addEventListener('click', () => {
-            this.swipeController.swipe('down');
+            this.swipeController.swipe();
             this.vibrateIfSupported(30);
         });
     }
 
-    handleSwipeLeft(card) {
-        console.log('👎 Swiped left on card', card.dataset.id);
-        this.cardManager.removeCard(card);
-        this.vibrateIfSupported(20);
-    }
-
-    handleSwipeRight(card) {
-        console.log('👍 Swiped right on card', card.dataset.id);
+    handleSwipe(card) {
+        console.log('👍 Swiped on card', card.dataset.id);
         this.cardManager.removeCard(card);
         this.vibrateIfSupported(20);
     }
